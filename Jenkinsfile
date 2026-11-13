@@ -1,42 +1,35 @@
-pipeline {
+pipeline{
     agent any
-    
-    tools {
-        maven 'local_maven'
-    }
-    parameters {
-         string(name: 'staging_server', defaultValue: '13.232.37.20', description: 'Remote Staging Server')
-    }
-
-stages{
-        stage('Build'){
-            steps {
-                sh 'mvn clean package'
-            }
-            post {
-                success {
-                    echo 'Archiving the artifacts'
-                    archiveArtifacts artifacts: '**/target/*.war'
-                }
+    stages{
+        stage('Clone'){
+            steps{
+              git branch: 'feature/2026.10.14', url: 'https://github.com/veerendrachilukuri/devOpsWeb.git'
             }
         }
-
-        stage ('Deployments'){
-            parallel{
-                stage ("Deploy to Staging"){
-                    steps {
-                        sh "scp -v -o StrictHostKeyChecking=no **/*.war root@${params.staging_server}:/opt/tomcat/webapps/"
-                    }
-                }
+        stage('Build'){
+            steps{
+                bat 'mvn install'
             }
-			
-			stage ('POLL SCM'){
-            parallel{
-                stage ("Deploy to Staging"){
-                    steps {
-                        sh "scp -v -o StrictHostKeyChecking=no **/*.war root@${params.staging_server}:/opt/tomcat/webapps/"
-                    }
-                }
+        }
+        stage('Test'){
+ 
+            steps{
+ 
+                bat 'mvn test'
+            }
+        }
+        stage('Published Artifcats'){
+ 
+            steps{
+ 
+                archiveArtifacts artifacts: 'target/*.war', followSymlinks: false
+            }
+        }
+        stage('Deploy'){
+ 
+            steps{
+ 
+              deploy adapters: [tomcat9(alternativeDeploymentContext: '', credentialsId: 'TomcatCredentials', path: '', url: 'http://localhost:8080/')], contextPath: 'DevOPsWeb', war: 'target/*.war'
             }
         }
     }
